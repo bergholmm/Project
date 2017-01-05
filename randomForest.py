@@ -42,7 +42,7 @@ def str_column_to_int(dataset, column):
 
 # Build a decision tree
 def build_tree(train, n_features):
-    root = get_split(dataset, n_features)
+    root = get_split(train, n_features)
     split(root, n_features)
     return root
 
@@ -128,14 +128,18 @@ def predict(node, row):
 # Forest functions
 # ---------------------------------------------------- #
 
+
 # Random Forest Algorithm
 def random_forest(train, test, sample_size, n_trees, n_features):
     trees = list()
+    out_of_bag = list()
     for i in range(n_trees):
         sample = subsample(train, sample_size)
         tree = build_tree(sample, n_features)
         trees.append(tree)
-    predictions = [bagging_predict(trees, row) for row in test]
+        t = filter(lambda x: x not in sample, train)
+        out_of_bag.append(t)
+    predictions = [forest_predict(trees, out_of_bag, row) for row in train]
     return predictions
 
 # Create a random subsample from the dataset with replacement
@@ -145,17 +149,15 @@ def subsample(dataset, ratio):
     while len(sample) < n_sample:
         index = randrange(len(dataset))
         sample.append(dataset[index])
-
     return sample
 
 # Make a prediction with a list of bagged trees
-def bagging_predict(trees, row):
-    predictions = [predict(tree, row) for tree in trees]
+def forest_predict(trees, out_of_bag, row):
+    predictions = list()
+    for i in range(len(trees)):
+        if row in out_of_bag[i]:
+            predictions.append(predict(trees[i], row))
     return max(set(predictions), key=predictions.count)
-
-# ---------------------------------------------------- #
-# Out-of-Bag functions
-# ---------------------------------------------------- #
 
 # ---------------------------------------------------- #
 # Other functions
@@ -180,10 +182,9 @@ def accuracy_metric(actual, predicted):
                 correct += 1
     return correct / float(len(actual)) * 100.0
 
-# Evaluate an algorithm using a cross validation split
 def evaluate(test_set, train_set, n_features, n_trees, sample_size):
     predicted = random_forest(train_set, test_set, sample_size, n_trees, n_features)
-    actual = [row[-1] for row in test_set]
+    actual = [row[-1] for row in train_set]
     accuracy = accuracy_metric(actual, predicted)
     return accuracy
 
@@ -200,32 +201,36 @@ def evaluate(test_set, train_set, n_features, n_trees, sample_size):
 #
 # ---------------------------------------------------- #
 
-# # Test the random forest algorithm
-# seed(1)
+def main():
+    # # Test the random forest algorithm
+    # seed(1)
 
-# load and prepare data
-filename = 'sonar.all-data.csv'
-dataset = load_csv(filename)
+    # load and prepare data
+    filename = 'sonar.all-data.csv'
+    dataset = load_csv(filename)
 
-# convert string attributes to integers
-for i in range(0, len(dataset[0])-1):
-        str_column_to_float(dataset, i)
+    # convert string attributes to integers
+    for i in range(0, len(dataset[0])-1):
+            str_column_to_float(dataset, i)
 
-# convert class column to integers
-str_column_to_int(dataset, len(dataset[0])-1)
+    # convert class column to integers
+    str_column_to_int(dataset, len(dataset[0])-1)
 
-# evaluate algorithm
-sample_size = 1.0
-n_features = 1
-n_trees = 100
+    # evaluate algorithm
+    sample_size = 1.0
+    n_features = 1
+    n_trees = 100
 
-test, train = split_dataset(dataset, 0.1)
-scores = list()
-# for i in range(100):
-score = evaluate(test, train, n_features, n_trees, sample_size,)
-scores.append(score)
-#     print(i)
+    test, train = split_dataset(dataset, 0.1)
+    scores = list()
+    # for i in range(100):
+    score = evaluate(test, dataset, n_features, n_trees, sample_size)
+    scores.append(score)
+    #     print(i)
 
-print('Trees: %d' % n_trees)
-print('Scores: %s' % scores)
-print('Mean Accuracy: %.3f%%' % (sum(scores)/float(len(scores))))
+    print('Trees: %d' % n_trees)
+    print('Scores: %s' % scores)
+    print('Mean Accuracy: %.3f%%' % (sum(scores)/float(len(scores))))
+
+if __name__ == "__main__":
+    main()
